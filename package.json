@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@pinecone-database/pinecone": "^0.1.5",
     "encoding": "^0.1.13",
     "eslint": "8.37.0",
     "eslint-config-next": "13.2.4",

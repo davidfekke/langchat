@@ -1,13 +1,16 @@
 // import { ChatOpenAI } from "langchain/chat_models";
 import { NextResponse } from "next/server";
 import { ChatOpenAI } from "langchain/chat_models/openai";
-import { LLMChain } from "langchain/chains";
+import { VectorDBQAChain, LLMChain } from "langchain/chains";
 import { CallbackManager } from "langchain/callbacks";
 import {
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
     SystemMessagePromptTemplate,
 } from "langchain/prompts";
+import { PineconeClient } from "@pinecone-database/pinecone";
+import { OpenAIEmbeddings } from "langchain/embeddings/openai";
+import { PineconeStore } from "langchain/vectorstores/pinecone";
 import { HumanChatMessage, SystemChatMessage } from "langchain/schema";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -21,6 +24,18 @@ export const config = {
 
 export default async function handler(req, res) {
     const body = await req.json()
+    
+    const client = new PineconeClient();
+    await client.init({
+        apiKey: process.env.PINECONE_API_KEY,
+        environment: process.env.PINECONE_ENVIRONMENT,
+    });
+    const pineconeIndex = client.Index(process.env.PINECONE_INDEX);
+    
+    const vectorStore = await PineconeStore.fromExistingIndex(
+        new OpenAIEmbeddings(),
+        { pineconeIndex }
+    );
 
     try {
         if (!OPENAI_API_KEY) {
@@ -51,22 +66,22 @@ export default async function handler(req, res) {
             }),
         });
 
-        // const chain = new LLMChain({ prompt, llm });
-        // chain.call({ query: query }).catch(console.error);
+        const results = await vectorStore.similaritySearch(`${body.query}`);
 
         // We can also construct an LLMChain from a ChatPromptTemplate and a chat model.
-        const chatPrompt = ChatPromptTemplate.fromPromptMessages([
-            SystemMessagePromptTemplate.fromTemplate(
-                "You are a helpful assistant that answers questions as best you can."
-            ),
-            HumanMessagePromptTemplate.fromTemplate("{input}"),
-        ]);
-        const chain = new LLMChain({
-            prompt: chatPrompt,
-            llm: llm,
+        // const chatPrompt = ChatPromptTemplate.fromPromptMessages([
+        //     SystemMessagePromptTemplate.fromTemplate(
+        //         "You are a helpful assistant that answers questions about Aviation for professional pilots."
+        //     ),
+        //     HumanMessagePromptTemplate.fromTemplate("{input}"),
+        // ]);
+        const chain = VectorDBQAChain.fromLLM(llm, vectorStore, {
+            k: 1,
+            returnSourceDocuments: true,
         });
+       
         chain
-            .call({input: body.query})
+            .call({query: body.query})
             .catch(console.error);
 
         return new NextResponse(stream.readable, {
