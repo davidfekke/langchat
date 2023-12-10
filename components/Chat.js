@@ -7,14 +7,7 @@ export default function Chat() {
     const [history, setHistory] = useState([]);
     const [finished, setFinished] = useState(true);
     const [messages, setMessages] = useState([
-        {
-            role: "human",
-            message: "hello mr robot 👋",
-        },
-        {
-            role: "ai",
-            message: "🤖 beep boop. hi. what do u want",
-        },
+        
     ]);
 
     useEffect(() => {
