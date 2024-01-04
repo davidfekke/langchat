@@ -8,7 +8,7 @@ import {
     HumanMessagePromptTemplate,
     SystemMessagePromptTemplate,
 } from "langchain/prompts";
-import { PineconeClient } from "@pinecone-database/pinecone";
+import { Pinecone } from "@pinecone-database/pinecone";
 import { OpenAIEmbeddings } from "langchain/embeddings/openai";
 import { PineconeStore } from "langchain/vectorstores/pinecone";
 import { HumanChatMessage, SystemChatMessage } from "langchain/schema";
@@ -24,17 +24,15 @@ export const config = {
 
 export default async function handler(req, res) {
     const body = await req.json()
-    
-    const client = new PineconeClient();
-    await client.init({
+    const client = new Pinecone({
         apiKey: process.env.PINECONE_API_KEY,
         environment: process.env.PINECONE_ENVIRONMENT,
-    });
+    }); 
     const pineconeIndex = client.Index(process.env.PINECONE_INDEX);
     
     const vectorStore = await PineconeStore.fromExistingIndex(
         new OpenAIEmbeddings(),
-        { pineconeIndex }
+        { pineconeIndex, namespace: 'aviationdata' }
     );
 
     try {
@@ -66,15 +64,14 @@ export default async function handler(req, res) {
             }),
         });
 
-        const results = await vectorStore.similaritySearch(`${body.query}`);
-
+        const results = await vectorStore.similaritySearch(`${body.query}`); // body.query
         // We can also construct an LLMChain from a ChatPromptTemplate and a chat model.
-        // const chatPrompt = ChatPromptTemplate.fromPromptMessages([
-        //     SystemMessagePromptTemplate.fromTemplate(
-        //         "You are a helpful assistant that answers questions about Aviation for professional pilots."
-        //     ),
-        //     HumanMessagePromptTemplate.fromTemplate("{input}"),
-        // ]);
+        const chatPrompt = ChatPromptTemplate.fromMessages([
+            SystemMessagePromptTemplate.fromTemplate(
+                "You are a helpful assistant that answers questions about Aviation for professional pilots."
+            ),
+            HumanMessagePromptTemplate.fromTemplate("{input}"),
+        ]);
         const chain = VectorDBQAChain.fromLLM(llm, vectorStore, {
             k: 1,
             returnSourceDocuments: true,
@@ -91,8 +88,8 @@ export default async function handler(req, res) {
             },
         });
     } catch (error) {
-        // console.error(error);
-        // res.status(500).send("Internal Server Error");
+        console.error(error);
+        res.status(500).send("Internal Server Error");
         return new Response(
             JSON.stringify(
                 { error: error.message },
@@ -104,3 +101,4 @@ export default async function handler(req, res) {
         );
     }
 }
+  

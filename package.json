@@ -3,20 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NODE_OPTIONS='--inspect' next dev",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@pinecone-database/pinecone": "^0.1.5",
+    "@pinecone-database/pinecone": "^1.1.2",
+    "ajv-errors": "^1.0.1",
     "encoding": "^0.1.13",
     "eslint": "8.37.0",
     "eslint-config-next": "13.2.4",
     "eventsource-parser": "^1.0.0",
     "into-stream": "^7.0.0",
-    "langchain": "^0.0.52-0",
-    "next": "13.2.4",
+    "langchain": "^0.0.203",
+    "next": "13.3.0",
     "openai": "^3.2.1",
     "react": "18.2.0",
     "react-dom": "18.2.0"
