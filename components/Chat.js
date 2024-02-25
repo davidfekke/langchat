@@ -40,7 +40,6 @@ export default function Chat() {
         setIncoming( { role: "ai", message: "" });
 
         const stream = res.body;
-        console.log(stream)
         const reader = stream.getReader();
 
         try {
@@ -51,7 +50,6 @@ export default function Chat() {
                 }
 
                 const decodedValue = new TextDecoder().decode(value);
-                console.log(decodedValue)
 
                 setIncoming( ({ role, message }) => ({ role, message: message + decodedValue }));
             }

@@ -9,16 +9,20 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@pinecone-database/pinecone": "^1.1.2",
+    "@langchain/community": "^0.0.32",
+    "@langchain/openai": "^0.0.14",
+    "ai": "^2.2.36",
     "ajv-errors": "^1.0.1",
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.4.4",
     "encoding": "^0.1.13",
     "eslint": "8.37.0",
     "eslint-config-next": "13.2.4",
     "eventsource-parser": "^1.0.0",
     "into-stream": "^7.0.0",
-    "langchain": "^0.0.203",
+    "langchain": "^0.1.21",
     "next": "13.3.0",
-    "openai": "^3.2.1",
+    "pg": "^8.11.3",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
