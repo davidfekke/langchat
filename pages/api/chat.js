@@ -1,83 +1,93 @@
-// import { ChatOpenAI } from "langchain/chat_models";
-import { NextResponse } from "next/server";
-import { ChatOpenAI } from "langchain/chat_models/openai";
-import { LLMChain } from "langchain/chains";
-import { CallbackManager } from "langchain/callbacks";
-import {
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-    SystemMessagePromptTemplate,
-} from "langchain/prompts";
-import { HumanChatMessage, SystemChatMessage } from "langchain/schema";
+import { streamToResponse } from 'ai';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+import { ChatOllama } from "@langchain/community/chat_models/ollama";
+import { OllamaEmbeddings } from "@langchain/community/embeddings/ollama";
+import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
+import { formatDocumentsAsString } from "langchain/util/document";
+import { PromptTemplate } from "@langchain/core/prompts";
+import {
+  RunnableSequence,
+  RunnablePassthrough,
+} from "@langchain/core/runnables";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+
+import * as dotenv from "dotenv";
+dotenv.config();
+
+const embeddings = new OllamaEmbeddings({
+    model: "nomic-embed-text", // default value
+    baseUrl: "http://localhost:11434", // default value
+    requestOptions: {
+        useMMap: true,
+        numThread: 6,
+        numGpu: 1,
+    },
+});
+
+const pgconfig = {
+    postgresConnectionOptions: {
+      type: "postgres",
+      host: "localhost",
+      port: 5432,
+      user: "postgres",
+      password: "password",
+      database: "pragmaticvector",
+    },
+    tableName: "vectordocs",
+    columns: {
+      idColumnName: "id",
+      vectorColumnName: "vector",
+      contentColumnName: "content",
+      metadataColumnName: "metadata",
+    },
+};
 
 export const config = {
     api: {
-      bodyParser: false,
-    },
-    runtime: "edge",
+      bodyParser: true,
+    }
 };
 
 export default async function handler(req, res) {
-    const body = await req.json()
+    const body = await req.body.query;
+
+    const pgvectorStore = await PGVectorStore.initialize(
+        embeddings,
+        pgconfig
+    );    
 
     try {
-        if (!OPENAI_API_KEY) {
-            throw new Error("OPENAI_API_KEY is not defined.");
-        }
-
-        const encoder = new TextEncoder();
-        const stream = new TransformStream();
-        const writer = stream.writable.getWriter();
-
-        const llm = new ChatOpenAI({
-            openAIApiKey: OPENAI_API_KEY,
-            temperature: 0.9,
-            streaming: true,
-            callbackManager: CallbackManager.fromHandlers({
-                handleLLMNewToken: async (token) => {
-                    await writer.ready;
-                    await writer.write(encoder.encode(`${token}`));
-                },
-                handleLLMEnd: async () => {
-                    await writer.ready;
-                    await writer.close();
-                },
-                handleLLMError: async (e) => {
-                    await writer.ready;
-                    await writer.abort(e);
-                },
-            }),
+        const model = new ChatOllama({
+            baseUrl: "http://localhost:11434", // Default value
+            model: "llama3", // Default value
+            debug: false
         });
+    
+        const retriever = pgvectorStore.asRetriever();
 
-        // const chain = new LLMChain({ prompt, llm });
-        // chain.call({ query: query }).catch(console.error);
-
-        // We can also construct an LLMChain from a ChatPromptTemplate and a chat model.
-        const chatPrompt = ChatPromptTemplate.fromPromptMessages([
-            SystemMessagePromptTemplate.fromTemplate(
-                "You are a helpful assistant that answers questions as best you can."
-            ),
-            HumanMessagePromptTemplate.fromTemplate("{input}"),
+        const prompt = PromptTemplate.fromTemplate(`Answer the question based only on the following context:
+        {context}
+        
+        Question: {question}`);
+        
+        const chain = RunnableSequence.from([
+          {
+              context: retriever.pipe(formatDocumentsAsString),
+              question: new RunnablePassthrough(),
+          },
+          prompt,
+          model,
+          new StringOutputParser(),
         ]);
-        const chain = new LLMChain({
-            prompt: chatPrompt,
-            llm: llm,
-        });
-        chain
-            .call({input: body.query})
-            .catch(console.error);
 
-        return new NextResponse(stream.readable, {
-            headers: {
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-            },
-        });
+        const stream2 = await chain.stream(body);
+        
+        streamToResponse(stream2, res)
+        pgvectorStore.end();
     } catch (error) {
-        // console.error(error);
-        // res.status(500).send("Internal Server Error");
+        console.error(error);
+        res.status(500).send("Internal Server Error");
+        pgvectorStore.end();
         return new Response(
             JSON.stringify(
                 { error: error.message },
