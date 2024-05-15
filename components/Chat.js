@@ -70,6 +70,9 @@ export default function Chat() {
     return (
         <div className="bg-slate-100">
             <div className="mx-auto max-w-[1000px] flex flex-col h-screen bg-white">
+                <div className="flex flex-row bg-[#1B76B2] text-white text-lg font-bold items-center">
+                    <img src="logo.png" className="w-36" /> Q&amp;A
+                </div>
                 <div
                     className="flex-grow overflow-y-auto p-4"
                 >
